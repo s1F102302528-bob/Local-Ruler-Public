@@ -1,0 +1,36 @@
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ArcGISマップ埋め込み</title>
+  <script src="https://js.arcgis.com/4.29/"></script>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+  <style>
+    #mapDiv {
+      height: 600px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>2020年人口</h1>
+  <div id="mapDiv"></div>
+
+  <script>
+    require([
+      "esri/views/MapView",
+      "esri/WebMap"
+    ], function(MapView, WebMap) {
+      const webmap = new WebMap({
+        portalItem: {
+          id: "530a5660aaf340ec957118e9bef217b9"  
+        }
+      });
+
+      const view = new MapView({
+        container: "mapDiv",
+        map: webmap
+      });
+    });
+  </script>
+</body>
+</html>

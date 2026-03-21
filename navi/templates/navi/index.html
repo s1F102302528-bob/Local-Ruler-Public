@@ -1,0 +1,49 @@
+{% extends "navi/base.html" %}
+{% load static %}
+{% block title %}
+    地域選択
+{%endblock %}
+{% block content %}
+<!-- 背景の動く図形 -->
+<div class="background-blobs">
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+</div>
+
+<div class="top-page-wrapper">
+  <div class="container top-page-container">
+    <h1>ローカル･ルーラー</h1>
+    <p>分析を開始する地域を選んでください</p>
+
+    <div class="form-group" style="max-width: 400px; margin: 0 auto">
+      <select id="regionSelect" class="form-control">
+        <option value="" disabled selected>都道府県・市区町村を選択</option>
+        {% for region in regions %}
+        <option value="{{ region.id }}">
+          {{ region.prefecture }} {{ region.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="margin-top: 20px">
+      <button type="button" class="btn" onclick="goToAnalysis()">
+        分析する
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function goToAnalysis() {
+    const select = document.getElementById("regionSelect");
+    const regionId = select.value;
+    if (regionId) {
+      window.location.href = "{% url 'analysis' 0 %}".replace("0", regionId);
+    } else {
+      alert("地域を選択してください");
+    }
+  }
+</script>
+{% endblock content %}

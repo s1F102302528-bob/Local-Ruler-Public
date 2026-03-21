@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>データ受信テスト</title>
+</head>
+<body style="font-family: monospace; padding: 20px;">
+    <h2>e-Stat 通信テスト</h2>
+    <p>ステータス: <span id="status" style="color: blue; font-weight: bold;">通信中...</span></p>
+    <hr>
+    <h3>▼ 取得した生データ (JSON)</h3>
+    <pre id="raw-data" style="background: #f0f0f0; padding: 10px; white-space: pre-wrap;">データ待ち...</pre>
+
+    <script>
+        // 画像にあったあなたのappIdを設定済みです
+        const APP_ID = 'fe881c7e2052484dabfd9f66639e961c662299f8';
+
+        // 【今回の作戦】
+        // データの「中身」ではなく、「統計表のリスト(getStatsList)」を取得します。
+        // "searchWord=人口" で検索をかけるだけなので、条件不一致エラーが起きません。
+        const API_URL = `https://api.e-stat.go.jp/rest/3.0/app/json/getStatsList?appId=${APP_ID}&searchWord=人口&limit=5`;
+
+        fetch(API_URL)
+            .then(response => {
+                // 通信自体の成否チェック
+                if (!response.ok) {
+                    throw new Error(`HTTPエラー: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 1. 画面のステータスを更新
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = "通信成功！データを受信しました。";
+                statusEl.style.color = "green";
+
+                // 2. 取得したJSONデータをそのまま画面に表示（整形して表示）
+                const jsonText = JSON.stringify(data, null, 2);
+                document.getElementById('raw-data').textContent = jsonText;
+                
+                // コンソールにも出す
+                console.log("受信データ:", data);
+            })
+            .catch(error => {
+                // エラー時の表示
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = "エラーが発生しました";
+                statusEl.style.color = "red";
+                
+                document.getElementById('raw-data').textContent = error.message;
+                console.error(error);
+            });
+    </script>
+</body>
+</html>

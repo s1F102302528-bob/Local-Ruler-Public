@@ -1,0 +1,500 @@
+/* ========================================================================
+   1. インポートと変数定義
+======================================================================== */
+
+/* Google Fontsからフォントを読み込み */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display.swap');
+
+/* --- カラーパレットと基本設定 --- */
+:root {
+    --background-color: #f7f9fc;
+    --primary-color: #2a6df5;
+    --primary-dark: #1a5ad9;
+    --secondary-color: #ff6a95;
+    --text-color: #333;
+    --light-text-color: #777;
+    --card-bg-color: #ffffff;
+    --border-color: #eef2f7;
+    --input-border-color: #dde4ee;
+    --accent-green: #28a745;
+    --danger-color: #e74c3c;
+    --shadow-color: rgba(42, 109, 245, 0.15);
+}
+
+/* ========================================================================
+   2. グローバルスタイル（サイト全体の基本スタイル）
+======================================================================== */
+
+body {
+    font-family: 'Noto Sans JP', sans-serif;
+    line-height: 1.7;
+    color: var(--text-color);
+    background-color: var(--background-color);
+    margin: 0;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* 背景に大きな曲線を追加 */
+body::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    left: -200px;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(42, 109, 245, 0.05), transparent 70%);
+    border-radius: 50%;
+    z-index: -1;
+    pointer-events: none;
+}
+
+main {
+    padding: 50px 0;
+}
+
+h2 {
+    font-size: 2.4em;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 40px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* 見出しの前の図形を円に変更 */
+h2::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-radius: 50%;
+}
+
+footer {
+    text-align: center;
+    padding: 40px;
+    margin-top: 50px;
+    color: var(--light-text-color);
+    font-size: 0.9em;
+    background-color: transparent;
+}
+
+/* ========================================================================
+   3. 汎用コンポーネント（ヘッダー、カード、ボタン、フォーム）
+======================================================================== */
+
+/* --- レイアウト --- */
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* --- ヘッダー & ナビゲーション --- */
+.app-header {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+    padding: 15px 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.app-header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 1.8em;
+    font-weight: 700;
+}
+
+.main-nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 10px;
+}
+
+.main-nav ul li a {
+    color: var(--light-text-color);
+    padding: 1px 10px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent; /* 下線の分のスペースを確保 */
+    display: block;
+}
+
+.main-nav ul li a:hover {
+    background-color: transparent;
+    color: var(--primary-color);
+    border-bottom-color: rgba(42, 109, 245, 0.2);
+}
+
+.main-nav ul li a.active {
+    background-color: transparent; /* <-- 変更 */
+    color: var(--primary-color);   /* <-- 変更 (文字色を青に) */
+    box-shadow: none;
+    border-bottom-color: var(--primary-color);
+}
+
+/* --- カード --- */
+.card {
+    background-color: var(--card-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.card:hover {
+    box-shadow: 0 15px 40px var(--shadow-color);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.card-header h3 {
+    margin: 0;
+}
+
+/* カード右上の装飾 */
+.card::after {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 150px;
+    height: 150px;
+    background: var(--primary-color);
+    opacity: 0.05;
+    border-radius: 50%;
+}
+
+/* --- フォーム要素 --- */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 1em;
+    border: 1px solid var(--input-border-color);
+    background-color: #fdfdff;
+    border-radius: 12px;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px var(--shadow-color);
+}
+
+.input-with-button {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* --- ボタン類 --- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    padding: 12px 24px;
+    font-size: 1em;
+    font-weight: 700;
+    border: none;
+    border-radius: 50px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px var(--shadow-color);
+}
+
+.btn:hover {
+    box-shadow: 0 8px 25px var(--shadow-color);
+}
+
+.btn-secondary {
+    background: #f0f4f9;
+    color: var(--primary-color);
+    box-shadow: none;
+}
+
+.btn-secondary:hover {
+    background: #e5ebf2;
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    color: var(--light-text-color);
+    cursor: pointer;
+    padding: 5px;
+    font-size: 1.1em;
+    transition: color 0.3s ease;
+}
+
+.btn-icon:hover {
+    color: var(--danger-color);
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-weight: bold;
+    padding: 5px;
+}
+
+/* ========================================================================
+   4. ページ固有のスタイル
+======================================================================== */
+
+/* --- [トップページ] 専用 --- */
+.top-page-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+.top-page-container {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    padding: 50px;
+    border-radius: 24px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.top-page-wrapper h1 {
+    font-size: 3.8em;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 15px;
+}
+
+.top-page-wrapper p {
+    font-size: 1.3em;
+    color: var(--light-text-color);
+    margin-bottom: 40px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* --- [ダッシュボード] プロジェクト計画エリア --- */
+.plan-view h4 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    color: var(--primary-dark);
+}
+
+.plan-view p {
+    background-color: var(--background-color);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.plan-view ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.plan-view ul li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.plan-view ul li::before {
+    content: '✓';
+    color: var(--accent-green);
+    margin-right: 10px;
+}
+
+.phase-edit-group {
+    background: #fdfdfd;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.milestones-container {
+    padding-left: 20px;
+    border-left: 2px solid var(--border-color);
+}
+
+/* --- [ITスキル学習] 検索結果リンク --- */
+.search-result-link {
+    display: block;
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    text-decoration: none;
+    color: var(--primary-color);
+    transition: background-color 0.3s ease;
+}
+
+.search-result-link:hover {
+    background-color: var(--background-color);
+}
+
+/* ========================================================================
+   5. アニメーション定義
+======================================================================== */
+
+/* --- トップページの背景アニメーション --- */
+.background-blobs {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.blob {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.6;
+    filter: blur(50px);
+    animation: move 20s infinite alternate;
+}
+
+.blob1 {
+    width: 400px;
+    height: 400px;
+    top: 10%;
+    left: 10%;
+    background: var(--primary-color);
+}
+
+.blob2 {
+    width: 300px;
+    height: 300px;
+    top: 60%;
+    right: 5%;
+    background: var(--secondary-color);
+    animation-duration: 15s;
+}
+
+.blob3 {
+    width: 250px;
+    height: 250px;
+    bottom: 10%;
+    left: 30%;
+    background: var(--accent-green);
+    animation-duration: 25s;
+}
+
+@keyframes move {
+    from {
+        transform: translate(0, 0) scale(1);
+    }
+    to {
+        transform: translate(100px, -50px) scale(1.2);
+    }
+}
+
+/* ========================================================================
+   6. レスポンシブ対応（スマホ用スタイル）
+======================================================================== */
+
+/* デフォルトではハンバーガーボタンを隠す */
+.mobile-menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    color: var(--primary-color);
+    cursor: pointer;
+}
+
+/* --- 画面幅が768px以下（タブレット・スマホ）の場合 --- */
+@media (max-width: 768px) {
+    
+    /* ハンバーガーボタンを表示 */
+    .mobile-menu-toggle {
+        display: block;
+    }
+
+    /* ナビゲーションメニューの初期状態（隠す設定） */
+    .main-nav {
+        position: absolute;
+        top: 100%;      /* ヘッダーの真下に配置 */
+        left: 0;
+        width: 100%;
+        background-color: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border-color);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        
+        /* アニメーション用設定 */
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+    }
+
+    /* クラス 'active' が付いたらメニューを開く */
+    .main-nav.active {
+        max-height: 500px; /* 十分な高さを指定 */
+    }
+
+    /* リンクを「縦並び」にする（これで改行崩れを防ぎます） */
+    .main-nav ul {
+        flex-direction: column; /* 縦方向に並べる */
+        padding: 0;
+    }
+
+    .main-nav ul li {
+        width: 100%;
+        text-align: center;
+    }
+
+    .main-nav ul li a {
+        display: block;       /* 横幅いっぱいに広げる */
+        padding: 15px 0;      /* タップしやすいように高さを出す */
+        border-bottom: 1px solid var(--border-color); /* 区切り線 */
+    }
+    
+    /* 最後の線の調整 */
+    .main-nav ul li:last-child a {
+        border-bottom: none;
+    }
+}

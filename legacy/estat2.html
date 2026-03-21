@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>e-Stat 都道府県別 総人口 (SSDS版)</title>
+    <style>
+        body { font-family: "Helvetica Neue", Arial, sans-serif; padding: 20px; color: #333; background: #f9f9f9; }
+        h2 { border-bottom: 2px solid #0055aa; padding-bottom: 10px; }
+        
+        .control-panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        select { padding: 8px; font-size: 16px; margin-left: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 14px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px 15px; text-align: left; }
+        th { background-color: #f0f0f0; position: sticky; top: 0; border-bottom: 2px solid #ccc; }
+        .num-val { text-align: right; font-weight: bold; color: #0055aa; }
+        
+        #status { font-weight: bold; color: #0055aa; margin-bottom: 10px; }
+        .info-text { font-size: 0.9em; color: #666; margin-top: 5px; }
+        .success-text { color: #008800; font-weight: bold; }
+        .error { color: red; background: #ffebee; padding: 10px; border: 1px solid red; }
+    </style>
+</head>
+<body>
+    <h2>e-Stat 都道府県別 総人口 (A1101指定)</h2>
+    
+    <div id="status">初期化中...</div>
+
+    <div class="control-panel" id="control-area" style="display:none;">
+        <label>表示する年: <select id="year-select"></select></label>
+        <div id="table-info" class="info-text"></div>
+        <div id="category-info" class="info-text success-text"></div>
+    </div>
+    
+    <div id="container"></div>
+
+    <script>
+        const APP_ID = 'fe881c7e2052484dabfd9f66639e961c662299f8';
+        
+        let allDataItems = [];
+        let labelMap = {};
+        let targetCategoryCode = null; 
+
+        init();
+
+        async function init() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                // --- Step 1: 統計表の検索 ---
+                statusEl.textContent = "統計表「社会・人口統計体系 A 人口」を検索中...";
+                
+                // 【修正点1】検索ワードを「A 人口」まで絞り込みます
+                const searchWord = "社会・人口統計体系 A 人口";
+                const searchUrl = `https://api.e-stat.go.jp/rest/3.0/app/json/getStatsList?appId=${APP_ID}&searchWord=${encodeURIComponent(searchWord)}&limit=10`;
+                
+                const listRes = await fetch(searchUrl);
+                const listJson = await listRes.json();
+                
+                // リスト取得チェック
+                const listResult = listJson.GET_STATS_LIST.DATALIST_INF;
+                if (!listResult || !listResult.TABLE_INF) {
+                    throw new Error("条件に合う統計表が見つかりませんでした。");
+                }
+                const tables = Array.isArray(listResult.TABLE_INF) ? listResult.TABLE_INF : [listResult.TABLE_INF];
+
+                // 【修正点2】タイトルに「A」と「人口」を含む表を確実に選びます
+                let targetId = null;
+                let targetTitle = "";
+
+                for (let tbl of tables) {
+                     const title = tbl.TITLE_SPEC ? (tbl.TITLE_SPEC.TABLE_NAME || tbl.TITLE) : tbl.TITLE;
+                     // 例: "Ａ　人口" や "A 人口" など
+                     if (title.includes("人口") && (title.includes("A") || title.includes("Ａ"))) {
+                         targetId = tbl['@id'];
+                         targetTitle = title;
+                         break;
+                     }
+                }
+                
+                // 見つからなければ検索結果の1番目を採用（保険）
+                if (!targetId && tables.length > 0) {
+                    targetId = tables[0]['@id'];
+                    const t = tables[0];
+                    targetTitle = t.TITLE_SPEC ? (t.TITLE_SPEC.TABLE_NAME || t.TITLE) : t.TITLE;
+                }
+
+                if (!targetId) throw new Error("統計表の特定に失敗しました。");
+                statusEl.textContent = `データ取得中... (表: ${targetTitle})`;
+
+                // --- Step 2: データ取得 ---
+                const dataUrl = `https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData?appId=${APP_ID}&statsDataId=${targetId}&limit=10000`;
+                const dataRes = await fetch(dataUrl);
+                const dataJson = await dataRes.json();
+
+                if (dataJson.GET_STATS_DATA.RESULT.STATUS !== 0) {
+                    throw new Error("APIエラー: " + dataJson.GET_STATS_DATA.RESULT.ERROR_MSG);
+                }
+
+                // --- Step 3: 「総人口」コード(A1101)の特定 ---
+                labelMap = createLabelMap(dataJson);
+                
+                // 【修正点3】コード A1101 を最優先で狙い撃ちします
+                targetCategoryCode = findTotalPopulationCode(labelMap['cat01']);
+                
+                if (!targetCategoryCode) {
+                    throw new Error("取得した表の中に「総人口 (A1101)」が見つかりませんでした。");
+                }
+
+                const foundName = labelMap['cat01'][targetCategoryCode];
+                document.getElementById('category-info').textContent = `抽出項目: ${foundName} (コード: ${targetCategoryCode})`;
+
+                // --- Step 4: UI構築 ---
+                const dataInf = dataJson.GET_STATS_DATA.STATISTICAL_DATA.DATA_INF;
+                if (!dataInf || !dataInf.VALUE) throw new Error("データの中身が空です");
+
+                allDataItems = Array.isArray(dataInf.VALUE) ? dataInf.VALUE : [dataInf.VALUE];
+
+                setupYearSelect(allDataItems, labelMap);
+                
+                document.getElementById('control-area').style.display = 'block';
+                document.getElementById('table-info').textContent = `統計表: ${targetTitle} (ID: ${targetId})`;
+                statusEl.style.display = 'none';
+
+            } catch (err) {
+                statusEl.className = "error";
+                statusEl.textContent = "エラー: " + err.message;
+                console.error(err);
+            }
+        }
+
+        // --- 総人口コード判定 (A1101優先) ---
+        function findTotalPopulationCode(catMap) {
+            if (!catMap) return null;
+            
+            // 1. 社会・人口統計体系の標準コード 'A1101' を直接確認
+            if (catMap['A1101']) return 'A1101';
+            if (catMap['#A01101']) return '#A01101'; 
+
+            // 2. なければ名前で検索（完全一致）
+            for (const [code, name] of Object.entries(catMap)) {
+                if (name === "総人口") return code;
+            }
+
+            // 3. 部分一致（最終手段）
+            for (const [code, name] of Object.entries(catMap)) {
+                if (name.includes("総人口") && !name.includes("男") && !name.includes("女")) {
+                    return code;
+                }
+            }
+            return null;
+        }
+
+        function setupYearSelect(items, map) {
+            const select = document.getElementById('year-select');
+            const yearsSet = new Set();
+            
+            // 該当するカテゴリのデータがある年だけを集める
+            items.forEach(item => {
+                if (item['@cat01'] === targetCategoryCode) {
+                    yearsSet.add(item['@time']);
+                }
+            });
+            
+            // 年のコード順にソート（新しい順）
+            const sortedYears = Array.from(yearsSet).sort().reverse();
+
+            if (sortedYears.length === 0) {
+                document.getElementById('container').textContent = "指定された項目のデータが見つかりませんでした。";
+                return;
+            }
+
+            sortedYears.forEach(yearCode => {
+                const yearName = map['time'][yearCode] || yearCode;
+                const option = document.createElement('option');
+                option.value = yearCode;
+                option.textContent = yearName;
+                select.appendChild(option);
+            });
+
+            // 初期表示
+            renderTable(sortedYears[0]);
+
+            select.addEventListener('change', (e) => renderTable(e.target.value));
+        }
+
+        function renderTable(targetYearCode) {
+            const container = document.getElementById('container');
+            
+            const targetData = allDataItems.filter(item => 
+                item['@time'] === targetYearCode && 
+                item['@cat01'] === targetCategoryCode
+            );
+
+            // 地域コード順にソート
+            targetData.sort((a, b) => (a['@area'] || "").localeCompare(b['@area'] || ""));
+
+            let html = `<table>
+                <thead><tr><th>地域</th><th>項目</th><th>値</th></tr></thead><tbody>`;
+
+            targetData.forEach(item => {
+                const areaCode = item['@area'];
+                const areaName = labelMap['area'] ? (labelMap['area'][areaCode] || areaCode) : "全国";
+                const catName = labelMap['cat01'][targetCategoryCode];
+                const val = Number(item['$']).toLocaleString();
+
+                html += `<tr>
+                    <td>${areaName}</td>
+                    <td>${catName}</td>
+                    <td class="num-val">${val} ${item['@unit']}</td>
+                </tr>`;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        function createLabelMap(jsonData) {
+            const map = {};
+            const classInf = jsonData.GET_STATS_DATA.STATISTICAL_DATA.CLASS_INF;
+            if (!classInf) return map;
+
+            const classObjects = classInf.CLASS_OBJ;
+            const objectsArray = Array.isArray(classObjects) ? classObjects : [classObjects];
+
+            objectsArray.forEach(obj => {
+                const id = obj['@id'];
+                map[id] = {};
+                const classes = Array.isArray(obj['CLASS']) ? obj['CLASS'] : [obj['CLASS']];
+                classes.forEach(c => {
+                    map[id][c['@code']] = c['@name'];
+                });
+            });
+            return map;
+        }
+    </script>
+</body>
+</html>

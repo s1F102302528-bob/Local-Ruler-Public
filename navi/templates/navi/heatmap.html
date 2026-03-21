@@ -1,0 +1,156 @@
+{% extends "navi/base.html" %} {% block title %}類似度ヒートマップ - {{
+base_region.name }}{% endblock %} {% block extra_head %}
+<!-- ArcGIS API for JavaScript CSS -->
+<link
+  rel="stylesheet"
+  href="https://js.arcgis.com/4.28/esri/themes/light/main.css"
+/>
+<style>
+  #viewDiv {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="container">
+  <h2>{{ base_region.name }} の類似度ヒートマップ</h2>
+  <p>
+    色が<span style="color: red; font-weight: bold">赤い</span>ほど、
+    {{base_region.name}} と統計的特徴が似ています（スコアが高い）。
+  </p>
+
+  <div
+    style="
+      height: 600px;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      margin-bottom: 50px;
+    "
+  >
+    <div id="viewDiv"></div>
+  </div>
+
+  <div style="text-align: center">
+    <a href="{% url 'similar' base_region.id %}" class="btn btn-secondary">
+      <i class="fas fa-arrow-left"></i> 類似地域リストに戻る
+    </a>
+  </div>
+</div>
+
+<!-- ArcGIS API for JavaScript -->
+<script src="https://js.arcgis.com/4.28/"></script>
+<script>
+  require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/GeoJSONLayer",
+      "esri/layers/FeatureLayer",
+      "esri/widgets/Legend",
+      "esri/widgets/Home"
+  ], function(Map, MapView, GeoJSONLayer, FeatureLayer, Legend, Home) {
+
+      const map = new Map({
+          basemap: "gray-vector"
+      });
+
+      // 自治体境界データ（背景用）
+      const boundaryLayer = new FeatureLayer({
+          url: "https://services.arcgis.com/p3eplmys2rvchkjx/arcgis/rest/services/JPN_Boundaries_ECM/FeatureServer/1",
+          opacity: 0.3,
+          title: "自治体境界",
+          renderer: {
+              type: "simple",
+              symbol: {
+                  type: "simple-fill",
+                  color: [0, 0, 0, 0], // 塗りつぶしなし
+                  outline: {
+                      color: [100, 100, 100, 0.5],
+                      width: 0.5
+                  }
+              }
+          },
+          minScale: 3000000 // ある程度ズームしたときのみ表示（重いため）
+      });
+      map.add(boundaryLayer);
+
+      const view = new MapView({
+          container: "viewDiv",
+          map: map,
+          center: {{ initial_view.center|safe }}, // サーバーから渡された初期座標
+          zoom: {{ initial_view.zoom }}
+      });
+
+      // ホームボタン追加
+      const homeWidget = new Home({
+          view: view
+      });
+      view.ui.add(homeWidget, "top-left");
+
+      // ヒートマップの色分けルール（ポイント用）
+      const renderer = {
+          type: "simple",
+          symbol: {
+              type: "simple-marker",  // ポイントとして表示
+              style: "circle",
+              size: 10,
+              color: [200, 200, 200, 0.5], // デフォルト
+              outline: {
+                  color: "white",
+                  width: 0.5
+              }
+          },
+          visualVariables: [{
+              type: "color",
+              field: "score",
+              stops: [
+                  { value: 50, color: "rgba(50, 100, 100, 0.5)", label: "低類似 (~50%)" },
+                  { value: 70, color: "rgba(50, 255, 255, 0.6)", label: "中程度 (70%)" },
+                  { value: 95, color: "rgba(255, 0, 0, 0.9)", label: "高類似 (95%~)" }
+              ]
+          }]
+      };
+
+      // APIからGeoJSONを取得してレイヤー化
+      const geojsonLayer = new GeoJSONLayer({
+          url: "{% url 'heatmap_api' base_region.id %}",
+          renderer: renderer,
+          title: "類似度スコア",
+          popupTemplate: {
+              title: "{prefecture} {name}",
+              content: [
+                  {
+                      type: "fields",
+                      fieldInfos: [
+                          {
+                              fieldName: "score",
+                              label: "総合類似度スコア",
+                              format: {
+                                  places: 1,
+                                  digitSeparator: true
+                              }
+                          }
+                      ]
+                  }
+              ]
+          }
+      });
+
+      map.add(geojsonLayer);
+
+      // 凡例の追加
+      const legend = new Legend({
+          view: view,
+          layerInfos: [{
+              layer: geojsonLayer,
+              title: "類似度"
+          }]
+      });
+      view.ui.add(legend, "bottom-right");
+
+  });
+</script>
+{% endblock content %}

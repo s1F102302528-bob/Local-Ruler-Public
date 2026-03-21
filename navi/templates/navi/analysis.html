@@ -1,0 +1,161 @@
+{% extends "navi/base.html" %}
+{% block title %}分析結果 - {{ region_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>{{ region_name }} の分析結果</h2>
+
+    <!-- 重要指標カード (既存のDBデータがあれば表示) -->
+    <div class="card">
+        <div class="card-header">
+            <h3>重要指標（最新データ）</h3>
+        </div>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; text-align: center; padding: 20px; background: #f9f9f9; border-radius: 10px;">
+                <h4>人口</h4>
+                <p style="font-size: 2em; font-weight: bold; color: var(--primary-color);">
+                    {% if latest_data %}
+                        {{ latest_data.population }}人
+                    {% elif excel_data.人口総数 %}
+                        {{ excel_data.人口総数 }}人
+                    {% else %}
+                        データなし
+                    {% endif %}
+                </p>
+            </div>
+            <div style="flex: 1; text-align: center; padding: 20px; background: #f9f9f9; border-radius: 10px;">
+                <h4>空き家率 / その他指標</h4>
+                <p style="font-size: 2em; font-weight: bold; color: var(--danger-color);">
+                    {% if latest_data %}
+                        {{ latest_data.empty_house_rate }}%
+                    {% else %}
+                        -
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細データテーブル (Excelデータ) -->
+    {% if excel_data %}
+    <div class="card" style="margin-top: 30px;">
+        <div class="card-header">
+            <h3>詳細統計データ（2025年予測）</h3>
+        </div>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                    <tr style="background-color: #eee;">
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">項目</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">値</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for key, value in excel_data.items %}
+                        {% if key != "市区町村" and key != "都道府県" and key != "市区町村ｺｰﾄﾞ" %}
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">{{ key }}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">{{ value }}</td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- グラフ表示エリア -->
+    <div class="card">
+        <div class="card-header">
+            <h3>地域概況グラフ</h3>
+        </div>
+        <div style="padding: 20px;">
+            <canvas id="statsChart" style="max-height: 400px;"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('statsChart').getContext('2d');
+            
+            // Djangoテンプレート変数からデータを取得
+            // ※ safeフィルタを使ってJSオブジェクトとして扱えるようにする
+            // 数値が文字列になっている場合があるため、パースが必要だが
+            // utils.pyで数値化済みなのでそのまま使えるはず
+            
+            const pop = {{ excel_data.総人口|default:0 }};
+            const households = {{ excel_data.総世帯数|default:0 }};
+            const employees = {{ excel_data.従業者数民営|default:0 }}; // カッコなどが変数名に使えないため別途修正が必要かも
+            // テンプレートタグでの辞書アクセスは .key だが、カッコ付きキーはアクセスしにくい。
+            // そこで、以下のように全てのデータをJSONとして渡してJS側でパースする手法をとる
+            
+            const rawData = {{ excel_data_json|safe }};
+            
+            // キー名のマッピング（Excelのヘッダー名に合わせる）
+            const val_pop = rawData["総人口"] || 0;
+            const val_house = rawData["総世帯数"] || 0;
+            const val_biz = rawData["事業所数（民営）"] || 0; 
+            const val_emp = rawData["従業者数（民営）"] || 0;
+
+            // グラフ描画
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['総人口', '総世帯数', '事業所数', '従業者数'],
+                    datasets: [{
+                        label: '{{ region_name }} の統計データ',
+                        data: [val_pop, val_house, val_biz, val_emp],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                            'rgba(153, 102, 255, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            type: 'logarithmic', // 人口と事業所数で桁が違うため対数軸推奨
+                            title: {
+                                display: true,
+                                text: '人数・件数 (対数軸)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: '基本統計指標の比較'
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+
+    <!-- アクションボタン -->
+    <div style="text-align: center; margin-top: 40px;">
+        <p>この地域と似た課題を持つ地域を探してみましょう。</p>
+        <a href="{% url 'similar' request.resolver_match.kwargs.region_id %}" class="btn">
+            <i class="fas fa-search"></i> 似た地域・解決事例を探す
+        </a>
+    </div>
+</div>
+{% endblock content %}

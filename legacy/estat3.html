@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地域分析指標データ取得 (e-Stat API)</title>
+    <style>
+        body { font-family: "Helvetica Neue", Arial, sans-serif; padding: 20px; color: #333; background: #f5f7fa; }
+        h2 { border-bottom: 2px solid #0055aa; padding-bottom: 10px; color: #0055aa; }
+        
+        /* コントロールパネル */
+        .control-panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; display: grid; gap: 15px; }
+        
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        select, button { padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; width: 100%; max-width: 400px; }
+        button { background-color: #0055aa; color: white; cursor: pointer; border: none; font-weight: bold; transition: background 0.2s; }
+        button:hover { background-color: #004488; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* ステータス表示 */
+        #status-area { margin-bottom: 15px; padding: 10px; border-radius: 4px; display: none; }
+        .status-loading { background-color: #e3f2fd; color: #0d47a1; border: 1px solid #bbdefb; }
+        .status-error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .status-success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+
+        /* テーブル */
+        .table-container { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 600px; }
+        th, td { border: 1px solid #ddd; padding: 12px 15px; text-align: left; }
+        th { background-color: #f0f4f8; position: sticky; top: 0; color: #333; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr:hover { background-color: #f1f1f1; }
+        .num-val { text-align: right; font-family: "Consolas", monospace; font-weight: bold; color: #0055aa; }
+        
+        .meta-info { font-size: 0.85em; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <h2>地域分析指標データ取得ツール</h2>
+    <p class="meta-info">画像内の指標を選択し、e-Stat APIから最新データを取得します。</p>
+
+    <div class="control-panel">
+        <div>
+            <label for="metric-select">1. 指標を選択 (画像の内容)</label>
+            <select id="metric-select">
+                <optgroup label="1. ターゲット変数 (何が起きているか)">
+                    <option value="A1101">総人口 (A1101)</option>
+                    <option value="A1301">総人口増減率 (A1301)</option>
+                    <option value="A1700">社会増減数 (A1700等)</option>
+                    <option value="A1600">自然増減数 (A1600等)</option>
+                </optgroup>
+                <optgroup label="2. 関連動向 (なぜ増減しているか)">
+                    <option value="C1221">課税対象所得 (Hコード/Cコード等 要検索)</option>
+                    <option value="F0301">完全失業率 (Fコード等)</option>
+                    <option value="F1101">女性の労働力率 (推定)</option>
+                    <option value="J2101">持ち家比率 (Jコード等)</option>
+                    <option value="E1301">合計特殊出生率</option>
+                    <option value="K3201">保育所定員数</option>
+                </optgroup>
+                <optgroup label="3. 地域特性 (前提条件)">
+                    <option value="B1103">可住地面積 (B1103)</option>
+                    <option value="D1201">財政力指数 (D1201等)</option>
+                    <option value="B4103">最深積雪 (気象データ)</option>
+                    <option value="A9101">昼夜間人口比率</option>
+                </optgroup>
+            </select>
+        </div>
+        
+        <div>
+            <label for="year-select">2. 表示年度を選択</label>
+            <select id="year-select" disabled>
+                <option value="">先に指標データを取得してください</option>
+            </select>
+        </div>
+
+        <button id="fetch-btn">データを取得・更新</button>
+    </div>
+
+    <div id="status-area"></div>
+    <div id="table-container" class="table-container"></div>
+
+    <script>
+        const APP_ID = 'fe881c7e2052484dabfd9f66639e961c662299f8'; // 提供されたIDを使用
+        
+        // グローバル変数
+        let currentData = [];
+        let labelMap = {};
+        
+        // DOM要素
+        const els = {
+            metricSelect: document.getElementById('metric-select'),
+            yearSelect: document.getElementById('year-select'),
+            fetchBtn: document.getElementById('fetch-btn'),
+            status: document.getElementById('status-area'),
+            container: document.getElementById('table-container')
+        };
+
+        // イベントリスナー
+        els.fetchBtn.addEventListener('click', handleFetch);
+        els.yearSelect.addEventListener('change', (e) => renderTable(e.target.value));
+
+        // 画像内の項目と、e-Statの「社会・人口統計体系」で使われそうな検索ワードのマッピング
+        // ※コード(value)は代表的なものを入れていますが、API検索でヒットさせるために「名前」も重要です。
+        const METRIC_CONFIG = {
+            'A1101': { name: "総人口", search: "社会・人口統計体系 A 人口" },
+            'A1301': { name: "人口増減率", search: "社会・人口統計体系 A 人口" }, // 同じ表にあることが多い
+            'A1700': { name: "社会増減", search: "社会・人口統計体系 A 人口" },
+            'A1600': { name: "自然増減", search: "社会・人口統計体系 A 人口" },
+            
+            'C1221': { name: "課税対象所得", search: "社会・人口統計体系 C 経済基盤" }, // H(財政)かC(経済)か要確認
+            'F0301': { name: "完全失業率", search: "社会・人口統計体系 F 労働" },
+            'F1101': { name: "労働力率", search: "社会・人口統計体系 F 労働" },
+            'J2101': { name: "持ち家", search: "社会・人口統計体系 J 居住" },
+            'E1301': { name: "合計特殊出生率", search: "社会・人口統計体系 E 医療" }, // E:医療・保健 にあることが多い
+            'K3201': { name: "保育所", search: "社会・人口統計体系 K 教育" }, // K:教育・文化・スポーツ
+            
+            'B1103': { name: "可住地面積", search: "社会・人口統計体系 B 自然環境" },
+            'D1201': { name: "財政力指数", search: "社会・人口統計体系 D 行政基盤" },
+            'B4103': { name: "積雪", search: "社会・人口統計体系 B 自然環境" },
+            'A9101': { name: "昼夜間人口比率", search: "社会・人口統計体系 A 人口" }
+        };
+
+        async function handleFetch() {
+            const code = els.metricSelect.value;
+            const config = METRIC_CONFIG[code];
+            
+            if (!config) {
+                showStatus("未定義の指標です。", "error");
+                return;
+            }
+
+            // UIリセット
+            els.container.innerHTML = "";
+            els.yearSelect.innerHTML = "";
+            els.yearSelect.disabled = true;
+            showStatus(`${config.name} (${code}) の統計表を検索中...`, "loading");
+
+            try {
+                // 1. 統計表情報の取得 (getStatsList)
+                // 検索ワードを使って該当する表を探す
+                const listUrl = `https://api.e-stat.go.jp/rest/3.0/app/json/getStatsList?appId=${APP_ID}&searchWord=${encodeURIComponent(config.search)}&limit=20`;
+                const listRes = await fetch(listUrl);
+                const listJson = await listRes.json();
+
+                const tableInf = listJson.GET_STATS_LIST.DATALIST_INF.TABLE_INF;
+                if (!tableInf) throw new Error("統計表が見つかりませんでした。");
+
+                const tables = Array.isArray(tableInf) ? tableInf : [tableInf];
+                
+                // 表の中から、選択したカテゴリコードを含んでいそうなものを優先的に選ぶ
+                // (社会・人口統計体系は都道府県別(000001)と市区町村別(000002)がある。通常は都道府県を見る)
+                let targetTableId = null;
+                let targetTitle = "";
+                
+                // 簡易ロジック: 一番最初に見つかった「社会・人口統計体系」の「都道府県」データを使う
+                for (let tbl of tables) {
+                    const title = tbl.TITLE_SPEC ? (tbl.TITLE_SPEC.TABLE_NAME || tbl.TITLE) : tbl.TITLE;
+                    // 都道府県レベルのデータを優先 (サイクルなどの細かい指定は割愛)
+                    if (title.includes("社会・人口統計体系")) {
+                        targetTableId = tbl['@id'];
+                        targetTitle = title;
+                        break;
+                    }
+                }
+                if (!targetTableId && tables.length > 0) {
+                    targetTableId = tables[0]['@id'];
+                    targetTitle = tables[0].TITLE;
+                }
+
+                showStatus(`データ取得中... 表: ${targetTitle}`, "loading");
+
+                // 2. 統計データの取得 (getStatsData)
+                // 目的のコード(code)を指定してデータ量を絞る
+                const dataUrl = `https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData?appId=${APP_ID}&statsDataId=${targetTableId}&cdCat01=${code}`;
+                
+                const dataRes = await fetch(dataUrl);
+                const dataJson = await dataRes.json();
+
+                if (dataJson.GET_STATS_DATA.RESULT.STATUS !== 0) {
+                    // コード指定で取れない場合、コードなしでリトライするか、エラーにする
+                    // ここではエラーとしてハンドリング（実際はコード体系が複雑なので厳密な検索が必要）
+                    throw new Error(`データ取得エラー: ${dataJson.GET_STATS_DATA.RESULT.ERROR_MSG} (コード ${code} がこの表に存在しない可能性があります)`);
+                }
+
+                // 3. データ処理
+                const dataInf = dataJson.GET_STATS_DATA.STATISTICAL_DATA.DATA_INF;
+                if (!dataInf) throw new Error("該当するデータがありませんでした。");
+                
+                currentData = Array.isArray(dataInf.VALUE) ? dataInf.VALUE : [dataInf.VALUE];
+                labelMap = createLabelMap(dataJson);
+
+                // 年リストの生成
+                setupYearSelect(currentData);
+                
+                showStatus(`取得成功: ${config.name}`, "success");
+
+            } catch (err) {
+                console.error(err);
+                showStatus(err.message, "error");
+            }
+        }
+
+        function setupYearSelect(items) {
+            const yearsSet = new Set();
+            items.forEach(item => yearsSet.add(item['@time']));
+            
+            // 新しい順にソート
+            const sortedYears = Array.from(yearsSet).sort().reverse();
+
+            if (sortedYears.length === 0) {
+                els.yearSelect.innerHTML = "<option>データなし</option>";
+                return;
+            }
+
+            els.yearSelect.innerHTML = "";
+            sortedYears.forEach(y => {
+                const opt = document.createElement('option');
+                opt.value = y;
+                // ラベルマップにあれば和暦などを表示、なければコード
+                const yearName = (labelMap['time'] && labelMap['time'][y]) ? labelMap['time'][y] : y;
+                opt.textContent = yearName;
+                els.yearSelect.appendChild(opt);
+            });
+            
+            els.yearSelect.disabled = false;
+            // 最新年を表示
+            renderTable(sortedYears[0]);
+        }
+
+        function renderTable(year) {
+            if (!year) return;
+            
+            // 選択年でフィルタリング
+            const displayData = currentData.filter(d => d['@time'] === year);
+            
+            // 地域コード順にソート
+            displayData.sort((a, b) => (a['@area'] || "").localeCompare(b['@area'] || ""));
+
+            let html = `<table><thead><tr><th>地域</th><th>項目名</th><th>値</th><th>単位</th></tr></thead><tbody>`;
+            
+            displayData.forEach(d => {
+                const areaCode = d['@area'];
+                const areaName = (labelMap['area'] && labelMap['area'][areaCode]) ? labelMap['area'][areaCode] : areaCode;
+                const catCode = d['@cat01'];
+                const catName = (labelMap['cat01'] && labelMap['cat01'][catCode]) ? labelMap['cat01'][catCode] : catCode;
+                const val = Number(d['$']).toLocaleString();
+                const unit = d['@unit'] || "";
+
+                html += `<tr>
+                    <td>${areaName}</td>
+                    <td>${catName}</td>
+                    <td class="num-val">${val}</td>
+                    <td>${unit}</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+            
+            els.container.innerHTML = html;
+        }
+
+        // ラベル情報のマッピング生成
+        function createLabelMap(json) {
+            const map = {};
+            const classInf = json.GET_STATS_DATA.STATISTICAL_DATA.CLASS_INF;
+            if (!classInf) return map;
+
+            const objs = Array.isArray(classInf.CLASS_OBJ) ? classInf.CLASS_OBJ : [classInf.CLASS_OBJ];
+            objs.forEach(obj => {
+                const id = obj['@id'];
+                map[id] = {};
+                const classes = Array.isArray(obj['CLASS']) ? obj['CLASS'] : [obj['CLASS']];
+                classes.forEach(c => {
+                    map[id][c['@code']] = c['@name'];
+                });
+            });
+            return map;
+        }
+
+        function showStatus(msg, type) {
+            els.status.style.display = 'block';
+            els.status.className = ''; // reset
+            els.status.classList.add(`status-${type}`);
+            els.status.textContent = msg;
+        }
+    </script>
+</body>
+</html>

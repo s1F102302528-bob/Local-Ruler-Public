@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local-Ruler - {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/navi/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% block header %}
+    <header class="app-header">
+        <div class="container">
+            <div class="logo"><a href="{% url 'index' %}">Local-Ruler</a></div>
+            <button class="mobile-menu-toggle" aria-label="メニューを開く">
+                 <i class="fas fa-bars"></i>
+            </button>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="{% url 'dashboard' %}" class="active">ダッシュボード</a></li>
+                    <li><a href="{% url 'data' %}">地域データ</a></li>
+                    <li><a href="{% url 'cases' %}">事例検索</a></li>
+                    <li><a href="{% url 'learning' %}">ITスキル学習</a></li>
+                    <li><a href="{% url 'settings' %}">設定</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    {% endblock header %}
+
+    <main>
+        {% block content %}
+        {% endblock content %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Local-Ruler</p>
+            <p style="font-size: 0.8em; color: #888; margin-top: 10px;">
+                出典: e-Stat『統計で見る市区町村のすがた』、Geolonia『住所データ』
+            </p>
+        </div>
+    </footer>
+    <script src="{% static 'js/navi/script.js' %}" defer></script>
+</body>
+</html>

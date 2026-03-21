@@ -1,0 +1,74 @@
+{% extends "navi/base.html" %}
+{% block title %}類似地域 - {{ base_region_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>{{ base_region_name }} と似ている地域・解決事例</h2>
+
+    <p style="margin-bottom: 30px;">
+        AI分析により、課題や統計データの傾向が似ている地域を抽出しました。<br>
+        これらの地域の取り組み（解決事例）は、{{ base_region_name }} にも応用できる可能性があります。
+    </p>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>類似地域ランキング</h3>
+        </div>
+        
+        <ul style="list-style: none; padding: 0;">
+            {% for item in similar_regions %}
+            <li style="padding: 20px; border-bottom: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 1.2em;">
+                            <span style="font-weight: normal; font-size: 0.8em; color: #666;">{{ item.pref }}</span>
+                            {{ item.name }}
+                        </h4>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 1.4em; font-weight: bold; color: var(--primary-color);">{{ item.score }}%</span>
+                        <div style="font-size: 0.8em; color: #666;">類似度スコア</div>
+                    </div>
+                </div>
+
+                <!-- 内訳スコアの表示 -->
+                <div style="display: flex; gap: 10px; font-size: 0.9em; background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
+                    <div style="flex: 1; text-align: center; border-right: 1px solid #ddd;">
+                        <div style="color: #666; font-size: 0.8em;">人口動態</div>
+                        <div style="font-weight: bold;">{{ item.factors.target_similarity }}%</div>
+                    </div>
+                    <div style="flex: 1; text-align: center; border-right: 1px solid #ddd;">
+                        <div style="color: #666; font-size: 0.8em;">社会要因</div>
+                        <div style="font-weight: bold;">{{ item.factors.related_similarity }}%</div>
+                    </div>
+                    <div style="flex: 1; text-align: center;">
+                        <div style="color: #666; font-size: 0.8em;">地域規模</div>
+                        <div style="font-weight: bold;">{{ item.factors.regional_similarity }}%</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px; text-align: right;">
+                     <!-- 詳細ページへのリンク（仮） -->
+                     <!-- 本来は地域IDが必要だが、ここでは仮リンク -->
+                     <a href="#" style="font-size: 0.9em; text-decoration: none; color: var(--primary-color);">詳細を見る &gt;</a>
+                </div>
+            </li>
+            {% empty %}
+            <li style="padding: 20px;">
+                <p>類似データが見つかりませんでした。</p>
+                <p style="font-size: 0.9em; color: #666;">
+                    ※データが正しくロードされていない可能性があります。管理者に連絡してください。
+                </p>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px;">
+        <p>全国の類似状況を地図で確認できます。</p>
+        <a href="{% url 'heatmap' request.resolver_match.kwargs.region_id %}" class="btn">
+            <i class="fas fa-map-marked-alt"></i> 地図（ヒートマップ）で見る
+        </a>
+    </div>
+</div>
+{% endblock content %}

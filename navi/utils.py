@@ -6,7 +6,6 @@ from django.conf import settings
 DATA_DIR = settings.BASE_DIR / "navi" / "data"
 
 # 類似度計算に使用する指標設定
-# ※実際のExcelファイルのカラム名に合わせて調整してください
 SIMILARITY_FEATURES = {
     # ターゲット傾向: 課題が表面的に現れる指標（人口動態など）
     # コサイン類似度を使用（絶対値より「変化の傾向」や「バランス」を重視）
@@ -485,7 +484,7 @@ def get_similar_municipalities(target_city_code: str, limit: int = 5) -> list[di
             s1_euc = _euclidean_similarity(
                 target_vec_full[target_cols].values, row[target_cols].values
             )
-            # コサイン(傾向) 7 : ユークリッド(規模) 3 の割合でブレンド (厳しく判定)
+            # コサイン(傾向) 8 : ユークリッド(規模) 2 の割合でブレンド
             s1 = (s1_cos * 0.8) + (s1_euc * 0.2)
 
         # 2. 関連特性 (社会要因)
@@ -501,7 +500,7 @@ def get_similar_municipalities(target_city_code: str, limit: int = 5) -> list[di
             s2 = (s2_cos * 0.6) + (s2_euc * 0.4)
 
         # 3. 地域特性 (規模・財政)
-        # 地域の「土台」としての類似性なので、規模(Euclidean)を重視
+        # 地域の「土台」としての類似性なので、規模を評価するユークリッドを重視
         s3 = 0.0
         if regional_cols:
             s3_cos = _cosine_similarity(
